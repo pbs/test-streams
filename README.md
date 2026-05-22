@@ -12,14 +12,16 @@ Only the patched manifests are hosted here; all media segments (`.ts`) are still
 
 Playlist: https://pbs.github.io/test-streams/test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
-### PBS — Test Pattern (HEVC + AVC)
+### PBS — Test Pattern
 
-A PBS-branded SMPTE-style color-bars test stream packaged as multivariant HLS with HEVC and AVC renditions (234p / 432p / 720p / 1080p, plus HEVC-only at 1440p and 2160p), I-frame playlists for trick-play, AAC audio, and a top-positioned WebVTT caption track.
+PBS-branded SMPTE-style color-bars test stream packaged as multivariant HLS, along with I-frame playlists for trick-play, AAC audio, and a top-positioned WebVTT caption track.
 
-Playlist: https://pbs.github.io/test-streams/streams/pbs/test-pattern/pbs-bars_hevc-avc.m3u8
+Built with AWS MediaConvert
 
-### PBS — Test Pattern (AV1 + VP9 + HEVC + AVC)
+#### HEVC + AVC
 
-The same PBS color-bars source packaged with the full codec ladder — AV1, VP9, HEVC, and AVC renditions across 234p / 432p / 720p / 1080p / 1440p / 2160p, each with a matching I-frame playlist, plus AAC audio and the top-positioned WebVTT caption track.
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_hevc-avc.m3u8
 
-Playlist: https://pbs.github.io/test-streams/streams/pbs/test-pattern/pbs-bars_av1-vp9-hevc-avc.m3u8
+#### AV1 + VP9 + HEVC + AVC
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_av1-vp9-hevc-avc.m3u8
