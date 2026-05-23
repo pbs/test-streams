@@ -14,7 +14,7 @@ Playlist: https://pbs.github.io/test-streams/test-streams.mux.dev/x36xhzz/x36xhz
 
 ### PBS — Test Pattern
 
-PBS-branded SMPTE-style color-bars test stream packaged as multivariant HLS, along with I-frame playlists for trick-play, AAC audio, and a top-positioned WebVTT caption track.
+PBS-branded SMPTE-style color-bars test stream packaged as 4K multicodec HLS, captions, burned in ABR variant id overlay (e.g. 720 HEVC or 2160 AV1), and I-frame playlists for trick-play.
 
 Built with AWS MediaConvert
 
