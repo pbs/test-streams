@@ -15,7 +15,9 @@
 //       - drop the PlayReady #EXT-X-KEY (a WRMHEADER data: URI, NOT cenc
 //         init-data — it derails hls.js EME setup). PlayReady stays available
 //         via the in-segment pssh box, exactly as Axinom delivers it;
-//       - unquote KEYID (RFC 8216 hexadecimal-sequence; Axinom is unquoted).
+//       - unquote KEYID (RFC 8216 hexadecimal-sequence; Axinom is unquoted);
+//       - append the IV to the FairPlay skd:// content-id (skd://<kid>:<IV>),
+//         the form Axinom's FairPlay license server expects.
 //   * a filtered pbs-bars_hevc-avc.m3u8 master (HEVC+AVC variants only).
 //
 // Usage: node scripts/build-4k-drm-dedicated-iframes.mjs
@@ -82,8 +84,19 @@ function cleanKeyTags(text) {
       if (isPlayReadyKeyLine(line)) return false; // PlayReady stays in the init pssh
       return true;
     })
-    // KEYID is an HLS hexadecimal-sequence and must be unquoted (RFC 8216).
-    .map((line) => (line.startsWith('#EXT-X-KEY') ? line.replace(/KEYID="(0x[0-9a-fA-F]+)"/, 'KEYID=$1') : line))
+    .map((line) => {
+      if (!line.startsWith('#EXT-X-KEY')) return line;
+      // KEYID is an HLS hexadecimal-sequence and must be unquoted (RFC 8216).
+      line = line.replace(/KEYID="(0x[0-9a-fA-F]+)"/, 'KEYID=$1');
+      // Match Axinom's FairPlay content-id: skd://<kid>:<IV>. The SPEKE output
+      // emits a bare skd://<kid>; append the line's own IV as the :suffix so
+      // Safari sends the form the Axinom FairPlay license server expects.
+      if (/URI="skd:\/\//.test(line) && !/URI="skd:\/\/[^"]*:[^"]+"/.test(line)) {
+        const iv = line.match(/IV=0x([0-9a-fA-F]+)/)?.[1];
+        if (iv) line = line.replace(/(URI="skd:\/\/[^"]*)"/, `$1:${iv.toUpperCase()}"`);
+      }
+      return line;
+    })
     .join('\n');
 }
 
