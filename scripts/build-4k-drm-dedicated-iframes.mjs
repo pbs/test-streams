@@ -6,10 +6,16 @@
 //   * the native byte-range #EXT-X-I-FRAMES-ONLY playlists replaced by DEDICATED
 //     standalone .cmfv I-frame fragments (no byte ranges), preserving the CBCS
 //     senc/saiz/saio boxes so trick-play frames stay decryptable;
-//   * a one-line DRM cleanup: the SPEKE output mislabels the PlayReady
-//     WRMHEADER with KEYFORMAT="com.apple.streamingkeydelivery"; we relabel it
-//     to "com.microsoft.playready" so PlayReady players find their key and
-//     FairPlay players aren't handed a bogus data: URI.
+//   * a DRM key-signaling cleanup that makes the manifests match Axinom's
+//     known-good cbcs reference (which plays in hls.js/Widevine). The verified
+//     content crypto (schm=cbcs, tenc pattern 1:9, KID, constant IV) is already
+//     identical to Axinom's; only the manifest key tags differed, so we:
+//       - drop all #EXT-X-SESSION-KEY tags from the masters (Axinom has none —
+//         it signals keys only in the media playlists);
+//       - drop the PlayReady #EXT-X-KEY (a WRMHEADER data: URI, NOT cenc
+//         init-data — it derails hls.js EME setup). PlayReady stays available
+//         via the in-segment pssh box, exactly as Axinom delivers it;
+//       - unquote KEYID (RFC 8216 hexadecimal-sequence; Axinom is unquoted).
 //   * a filtered pbs-bars_hevc-avc.m3u8 master (HEVC+AVC variants only).
 //
 // Usage: node scripts/build-4k-drm-dedicated-iframes.mjs
@@ -55,35 +61,29 @@ async function mapLimit(items, limit, fn, onProgress) {
   return results;
 }
 
-// ── DRM key-tag cleanup ────────────────────────────────────────────────────────
+// ── DRM key-tag cleanup (match Axinom's known-good cbcs signaling) ─────────────
 
-// The SPEKE output delivers the PlayReady WRMHEADER (a data: URI) under
-// KEYFORMAT="com.apple.streamingkeydelivery". FairPlay never uses a data: URI
-// (it uses skd://), so any com.apple key carrying a data: URI is the mislabeled
-// PlayReady object — relabel it. The real FairPlay skd:// line is untouched.
+// Detect the PlayReady #EXT-X-KEY: a data: URI whose payload is a PlayReady
+// Object (UTF-16LE WRMHEADER). The SPEKE output mislabels it with
+// KEYFORMAT="com.apple.streamingkeydelivery", so we identify it by CONTENT, not
+// label. The Widevine key (data: URI = pssh) and the real FairPlay skd:// key
+// do not decode to a WRMHEADER, so they're left alone.
+function isPlayReadyKeyLine(line) {
+  if (!line.startsWith('#EXT-X-KEY') || !/URI="data:/.test(line)) return false;
+  const b64 = line.match(/URI="data:[^"]*base64,([^"]*)"/)?.[1] ?? '';
+  return /playready|WRMHEADER/i.test(Buffer.from(b64, 'base64').toString('utf16le'));
+}
+
 function cleanKeyTags(text) {
   return text
     .split(/\r?\n/)
-    .map((line) => {
-      if (
-        (line.startsWith('#EXT-X-KEY') || line.startsWith('#EXT-X-SESSION-KEY')) &&
-        /KEYFORMAT="com\.apple\.streamingkeydelivery"/.test(line) &&
-        /URI="data:/.test(line)
-      ) {
-        const uri = line.match(/URI="data:[^"]*base64,([^"]*)"/)?.[1] ?? '';
-        // PlayReady Object: binary header + UTF-16LE WRMHEADER XML. Decode as
-        // UTF-16LE so the marker text is matchable.
-        const decoded = Buffer.from(uri, 'base64').toString('utf16le');
-        if (!/playready|WRMHEADER/i.test(decoded)) {
-          throw new Error(`com.apple data: URI is not PlayReady — refusing to relabel:\n${line}`);
-        }
-        return line.replace(
-          'KEYFORMAT="com.apple.streamingkeydelivery"',
-          'KEYFORMAT="com.microsoft.playready"',
-        );
-      }
-      return line;
+    .filter((line) => {
+      if (line.startsWith('#EXT-X-SESSION-KEY')) return false; // Axinom: none
+      if (isPlayReadyKeyLine(line)) return false; // PlayReady stays in the init pssh
+      return true;
     })
+    // KEYID is an HLS hexadecimal-sequence and must be unquoted (RFC 8216).
+    .map((line) => (line.startsWith('#EXT-X-KEY') ? line.replace(/KEYID="(0x[0-9a-fA-F]+)"/, 'KEYID=$1') : line))
     .join('\n');
 }
 
