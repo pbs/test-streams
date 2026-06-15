@@ -45,3 +45,30 @@ Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_hevc-avc.
 #### AV1 + VP9 + HEVC + AVC
 
 Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_av1-vp9-hevc-avc.m3u8
+
+### PBS — 4K DRM Test Pattern (dedicated I-frame playlists)
+
+PBS-branded SMPTE-style color-bars test stream packaged as 4K multicodec HLS (AV1, HEVC, AVC at multiple resolutions) with **CBCS/SAMPLE-AES** encryption via Axinom DRM. Each variant has a dedicated `EXT-X-I-FRAMES-ONLY` playlist backed by standalone CMAF fragment files (no byte-range references) so trick-play frames decrypt cleanly with the same keys.
+
+#### AV1 + VP9 + HEVC + AVC
+
+Playlist: https://pbs.github.io/test-streams/pbs/4k-drm-dedicated-iframes/pbs-bars.m3u8
+
+#### HEVC + AVC
+
+Playlist: https://pbs.github.io/test-streams/pbs/4k-drm-dedicated-iframes/pbs-bars_hevc-avc.m3u8
+
+#### DRM
+
+| Property | Value |
+|---|---|
+| Key ID | `302f80dd-411e-4886-bca5-bb1f8018a024` |
+| Widevine license server | `https://drm-widevine-licensing.axprod.net/AcquireLicense` |
+| FairPlay license server | `https://drm-fairplay-licensing.axprod.net/AcquireLicense` |
+| Auth header | `X-AxDRM-Message` |
+
+JWT token (from [Axinom public-test-vectors](https://github.com/Axinom/public-test-vectors)):
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJ2ZXJzaW9uIjogMSwKICAiY29tX2tleV9pZCI6ICI2OWU1NDA4OC1lOWUwLTQ1MzAtOGMxYS0xZWI2ZGNkMGQxNGUiLAogICJtZXNzYWdlIjogewogICAgInR5cGUiOiAiZW50aXRsZW1lbnRfbWVzc2FnZSIsCiAgICAidmVyc2lvbiI6IDIsCiAgICAibGljZW5zZSI6IHsKICAgICAgImFsbG93X3BlcnNpc3RlbmNlIjogdHJ1ZQogICAgfSwKICAgICJjb250ZW50X2tleXNfc291cmNlIjogewogICAgICAiaW5saW5lIjogWwogICAgICAgIHsKICAgICAgICAgICJpZCI6ICIzMDJmODBkZC00MTFlLTQ4ODYtYmNhNS1iYjFmODAxOGEwMjQiLAogICAgICAgICAgImVuY3J5cHRlZF9rZXkiOiAicm9LQWcwdDdKaTFpNDNmd3YremZ0UT09IiwKICAgICAgICAgICJ1c2FnZV9wb2xpY3kiOiAiUG9saWN5IEEiCiAgICAgICAgfQogICAgICBdCiAgICB9LAogICAgImNvbnRlbnRfa2V5X3VzYWdlX3BvbGljaWVzIjogWwogICAgICB7CiAgICAgICAgIm5hbWUiOiAiUG9saWN5IEEiLAogICAgICAgICJwbGF5cmVhZHkiOiB7CiAgICAgICAgICAibWluX2RldmljZV9zZWN1cml0eV9sZXZlbCI6IDE1MCwKICAgICAgICAgICJwbGF5X2VuYWJsZXJzIjogWwogICAgICAgICAgICAiNzg2NjI3RDgtQzJBNi00NEJFLThGODgtMDhBRTI1NUIwMUE3IgogICAgICAgICAgXQogICAgICAgIH0KICAgICAgfQogICAgXQogIH0KfQ._NfhLVY7S6k8TJDWPeMPhUawhympnrk6WAZHOVjER6M
+```
