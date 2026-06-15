@@ -65,6 +65,7 @@ Playlist: https://pbs.github.io/test-streams/pbs/4k-drm-dedicated-iframes/pbs-ba
 | Key ID | `302f80dd-411e-4886-bca5-bb1f8018a024` |
 | Widevine license server | `https://drm-widevine-licensing.axprod.net/AcquireLicense` |
 | FairPlay license server | `https://drm-fairplay-licensing.axprod.net/AcquireLicense` |
+| FairPlay certificate | `https://tools.axinom.com/FPScert/fairplay.cer` |
 | Auth header | `X-AxDRM-Message` |
 
 JWT token (from [Axinom public-test-vectors](https://github.com/Axinom/public-test-vectors)):
