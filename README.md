@@ -46,6 +46,68 @@ Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_hevc-avc.
 
 Playlist: https://pbs.github.io/test-streams/pbs/test-pattern/pbs-bars_av1-vp9-hevc-avc.m3u8
 
+### PBS — Test Pattern (dedicated I-frame playlists)
+
+Clear (unencrypted) AVC repackage of the PBS test pattern — 234p/432p/720p/1080p CMAF video (`.cmfv`), AAC audio (`.cmfa`), and captions (`.cmft`). Each variant has a dedicated `EXT-X-I-FRAMES-ONLY` playlist backed by standalone CMAF fragment files (`*-iframe.cmfv`, no byte-range references), one per IDR, carved out of the parent segments.
+
+Built with [scripts/generate-dedicated-pbs-iframes.mjs](scripts/generate-dedicated-pbs-iframes.mjs) from the PBS Test Pattern stream above.
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-dedicated-iframes/pbs-bars_avc.m3u8
+
+### PBS — Test Pattern (muxed fMP4, with I-frame playlists)
+
+PBS-branded color-bars test stream packaged as **muxed** fMP4 HLS — audio and video tracks together in one init segment and one set of `.m4s` segments per variant, the way ffmpeg's HLS muxer packages by default. `EXT-X-I-FRAME-STREAM-INF` entries plus I-frame-only child playlists use moof-anchored byte ranges (start of the `moof` through the end of the IDR sample's bytes in the `mdat`).
+
+This stream exists to exercise HLS clients against muxed fMP4 I-frame playlists: the init segment referenced by the I-frame playlists contains both tracks, and each I-frame byte range covers the full `moof` (audio + video track fragments) with a truncated `mdat`.
+
+Built with [scripts/build-muxed-fmp4-stream.mjs](scripts/build-muxed-fmp4-stream.mjs) (ffmpeg, plus optionally Apple's `mediafilesegmenter` and Bento4's `mp4encrypt` for the variants that need them — those are skipped with a note when the tools are missing).
+
+#### AVC (ffmpeg: 720p + 432p)
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-avc.m3u8
+
+#### HEVC (ffmpeg/libx265: 720p)
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-hevc.m3u8
+
+#### HEVC (Apple mediafilesegmenter: 720p, interleaved multi-trun)
+
+Packaged by Apple's own `mediafilesegmenter --format iso` from the same encode: audio and video track runs interleave through the `mdat` (several `trun` boxes per `traf` instead of one), and the I-frame index is the segmenter's own (`-z`).
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-hevc-apple.m3u8
+
+#### AVC, CBCS-encrypted (Bento4 mp4encrypt: single-file byterange)
+
+The clear AVC 720p variant encrypted with `mp4encrypt --method MPEG-CBCS` into a single fMP4 addressed entirely by `EXT-X-BYTERANGE` (the media and I-frame playlists point into the same file). Signals both Widevine (`data:` pssh) and FairPlay (`skd://`) with the shared Axinom key — see *Axinom DRM* below. The encrypted I-frame playlist intentionally exercises muxed+encrypted I-frame byte ranges, which hls.js does not support yet.
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-avc-cbcs.m3u8
+
+#### HEVC, SAMPLE-AES-encrypted (Apple mediafilesegmenter)
+
+The mediafilesegmenter variant encrypted by the segmenter itself (`-S`, CBCS) with the shared Axinom key. FairPlay-only: Apple's tooling writes no key ID (the `tenc` KID is zeros), so the key is identified by the `skd://` URI — playable via FairPlay (see *Axinom DRM* below), not Widevine.
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-hevc-apple-cbcs.m3u8
+
+### PBS — Test Pattern (multi-DRM, shaka packager)
+
+The clear *PBS — Test Pattern* (HEVC + AVC) ladder repackaged with [Shaka Packager](https://github.com/shaka-project/shaka-packager): HEVC 234p–2160p and AVC 234p–1080p video, AAC audio, WebVTT captions, **CBCS** encryption with the shared Axinom key (see *Axinom DRM* below), Widevine + PlayReady `pssh` boxes in the init segments, FairPlay `skd://` key tags, and an `EXT-X-I-FRAMES-ONLY` playlist per variant. PlayReady `EXT-X-KEY` tags are omitted to match Axinom's reference packaging (hls.js EME setup fails on WRMHEADER `data:` key URIs; PlayReady clients use the `pssh`).
+
+Built with [scripts/build-drm-stream.mjs](scripts/build-drm-stream.mjs).
+
+#### HEVC + AVC
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-drm/pbs-bars_hevc-avc.m3u8
+
+#### AVC only
+
+Use this with Widevine in Chrome/Edge: their CDM cannot decode **encrypted** HEVC (licensing succeeds and the key reports usable, but no frames ever decode), so the mixed master stalls silently whenever ABR starts on an HEVC level.
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-drm/pbs-bars_avc.m3u8
+
+#### HEVC only
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-drm/pbs-bars_hevc.m3u8
+
 ### PBS — 4K DRM Test Pattern (dedicated I-frame playlists)
 
 PBS-branded SMPTE-style color-bars test stream packaged as 4K multicodec HLS (AV1, HEVC, AVC at multiple resolutions) with **CBCS/SAMPLE-AES** encryption via Axinom DRM. Each variant has a dedicated `EXT-X-I-FRAMES-ONLY` playlist backed by standalone CMAF fragment files (no byte-range references) so trick-play frames decrypt cleanly with the same keys.
@@ -58,12 +120,16 @@ Playlist: https://pbs.github.io/test-streams/pbs/4k-drm-dedicated-iframes/pbs-ba
 
 Playlist: https://pbs.github.io/test-streams/pbs/4k-drm-dedicated-iframes/pbs-bars_hevc-avc.m3u8
 
-#### DRM
+### Axinom DRM (all encrypted PBS streams)
+
+The encrypted PBS streams above (4K DRM, multi-DRM shaka, and the encrypted muxed variants) all use the Axinom public test vector, so they license through Axinom's public servers:
 
 | Property | Value |
 |---|---|
 | Key ID | `302f80dd-411e-4886-bca5-bb1f8018a024` |
+| Content key (hex) | `15b2aaf906ebec6309d40f91289127b8` |
 | Widevine license server | `https://drm-widevine-licensing.axprod.net/AcquireLicense` |
+| PlayReady license server | `https://drm-playready-licensing.axprod.net/AcquireLicense` |
 | FairPlay license server | `https://drm-fairplay-licensing.axprod.net/AcquireLicense` |
 | FairPlay certificate | `https://tools.axinom.com/FPScert/fairplay.cer` |
 | Auth header | `X-AxDRM-Message` |
