@@ -414,11 +414,7 @@ async function writeVariantMaster(masterName, variant, info) {
   console.log(`Wrote ${resolve(OUT_DIR, masterName)}`);
 }
 
-// CBCS-encrypt a clear ffmpeg variant with Bento4 mp4encrypt into a
-// single-file byterange asset (media + I-Frame playlists point into one
-// encrypted fMP4; mp4encrypt keeps styp segment boundaries).
-async function buildEncryptedByterangeVariant(clearVariant) {
-  const name = `${clearVariant.name}-cbcs`;
+async function hasMp4encrypt(name) {
   try {
     await execFileP(MP4ENCRYPT, []);
   } catch (e) {
@@ -426,9 +422,20 @@ async function buildEncryptedByterangeVariant(clearVariant) {
       console.log(
         `[${name}] skipped: mp4encrypt not found (brew install bento4 or set MP4ENCRYPT)`,
       );
-      return;
+      return false;
     }
     // no-args usage error means the tool exists
+  }
+  return true;
+}
+
+// CBCS-encrypt a clear ffmpeg variant with Bento4 mp4encrypt into a
+// single-file byterange asset (media + I-Frame playlists point into one
+// encrypted fMP4; mp4encrypt keeps styp segment boundaries).
+async function buildEncryptedByterangeVariant(clearVariant) {
+  const name = `${clearVariant.name}-cbcs`;
+  if (!(await hasMp4encrypt(name))) {
+    return;
   }
   const { map, segments } = parseMediaPlaylist(
     await readFile(resolve(OUT_DIR, `${clearVariant.name}.m3u8`), 'utf8'),
@@ -437,6 +444,83 @@ async function buildEncryptedByterangeVariant(clearVariant) {
   for (const seg of segments) {
     parts.push(await readFile(resolve(OUT_DIR, seg.uri)));
   }
+  await encryptToByterangeAsset(
+    name,
+    parts,
+    segments,
+    { ...clearVariant, name },
+    'pbs-bars_muxed-avc-cbcs.m3u8',
+  );
+}
+
+// Interleaved (mediafilesegmenter-packaged) AVC variant encrypted with
+// mp4encrypt: the multi-trun layout plus a real key id makes encrypted
+// muxed I-Frame handling testable with Widevine.
+async function buildInterleavedEncryptedVariant(avcVariant) {
+  const name = 'pbs-bars-muxed-AVC-720p-apple-cbcs';
+  if (!(await hasMp4encrypt(name))) {
+    return;
+  }
+  try {
+    await execFileP(MEDIAFILESEGMENTER, ['--version']);
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      console.log(
+        `[${name}] skipped: mediafilesegmenter not found ` +
+          '(add to PATH or set MEDIAFILESEGMENTER)',
+      );
+      return;
+    }
+  }
+  const source = resolve(OUT_DIR, `${name}_tmp-source.mp4`);
+  console.log(`[${name}] ffmpeg encoding source...`);
+  await execFileP(
+    'ffmpeg',
+    [...encodeArgs({ ...avcVariant, name: undefined }), source],
+    { maxBuffer: 16 * 1024 * 1024 },
+  );
+  console.log(`[${name}] mediafilesegmenter packaging...`);
+  await execFileP(
+    MEDIAFILESEGMENTER,
+    [
+      '--format', 'iso',
+      '-t', '3',
+      '-f', OUT_DIR,
+      '-B', `${name}_tmp-seg_`,
+      '-i', `${name}_tmp-index.m3u8`,
+      '-z', 'none',
+      source,
+    ],
+    { maxBuffer: 16 * 1024 * 1024 },
+  );
+  const { map, segments } = parseMediaPlaylist(
+    await readFile(resolve(OUT_DIR, `${name}_tmp-index.m3u8`), 'utf8'),
+  );
+  const parts = [await readFile(resolve(OUT_DIR, map))];
+  for (const seg of segments) {
+    parts.push(await readFile(resolve(OUT_DIR, seg.uri)));
+  }
+  await encryptToByterangeAsset(
+    name,
+    parts,
+    segments,
+    { ...avcVariant, name },
+    'pbs-bars_muxed-avc-apple-cbcs.m3u8',
+  );
+  for (const f of (await readdir(OUT_DIR)).filter((f) =>
+    f.startsWith(`${name}_tmp-`),
+  )) {
+    await rm(resolve(OUT_DIR, f));
+  }
+}
+
+async function encryptToByterangeAsset(
+  name,
+  parts,
+  segments,
+  variant,
+  masterName,
+) {
   const concatFile = resolve(OUT_DIR, `${name}_tmp-concat.mp4`);
   const psshFile = resolve(OUT_DIR, `${name}_tmp-pssh.bin`);
   await writeFile(concatFile, Buffer.concat(parts));
@@ -459,9 +543,11 @@ async function buildEncryptedByterangeVariant(clearVariant) {
   const buffer = await readFile(resolve(OUT_DIR, fileName));
   const tops = findTopBoxes(buffer);
   const moovEnd = tops.find((b) => b.type === 'moov').end;
-  const bounds = tops.filter((b) => b.type === 'styp').map((b) => b.offset);
-  bounds.push(buffer.byteLength);
   const moofs = tops.filter((b) => b.type === 'moof');
+  // Segment bounds: styp markers when present (ffmpeg), else the moofs (mediafilesegmenter)
+  const styps = tops.filter((b) => b.type === 'styp');
+  const bounds = (styps.length ? styps : moofs).map((b) => b.offset);
+  bounds.push(buffer.byteLength);
   if (moofs.length !== segments.length) {
     throw new Error(
       `${name}: ${moofs.length} moofs for ${segments.length} segments`,
@@ -518,11 +604,7 @@ async function buildEncryptedByterangeVariant(clearVariant) {
   console.log(
     `[${name}] ${segments.length} I-frames, ${(iframeBytes / 1024).toFixed(0)} KiB over ${totalDuration.toFixed(2)}s -> ${info.iframeBandwidth} bps`,
   );
-  await writeVariantMaster(
-    'pbs-bars_muxed-avc-cbcs.m3u8',
-    { ...clearVariant, name },
-    info,
-  );
+  await writeVariantMaster(masterName, variant, info);
 }
 
 function parseIframePlaylist(text) {
@@ -734,6 +816,7 @@ async function main() {
   }
 
   await buildEncryptedByterangeVariant(VARIANTS[0]);
+  await buildInterleavedEncryptedVariant(VARIANTS[0]);
 }
 
 main().catch((e) => {

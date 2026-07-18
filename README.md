@@ -82,6 +82,12 @@ The clear AVC 720p variant encrypted with `mp4encrypt --method MPEG-CBCS` into a
 
 Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-avc-cbcs.m3u8
 
+#### AVC, CBCS-encrypted, interleaved (Apple mediafilesegmenter + Bento4 mp4encrypt)
+
+An AVC 720p encode packaged by `mediafilesegmenter --format iso` (interleaved multi-trun layout) and then encrypted with `mp4encrypt --method MPEG-CBCS` into a single-file byterange asset with the shared Axinom key. Combines the interleaved layout with a real key id, making encrypted multi-trun muxed I-Frame handling testable with Widevine (see *Axinom DRM* below).
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-avc-apple-cbcs.m3u8
+
 #### HEVC, SAMPLE-AES-encrypted (Apple mediafilesegmenter)
 
 The mediafilesegmenter variant encrypted by the segmenter itself (`-S`, CBCS) with the shared Axinom key. FairPlay-only: Apple's tooling writes no key ID (the `tenc` KID is zeros), so the key is identified by the `skd://` URI — playable via FairPlay (see *Axinom DRM* below), not Widevine.
