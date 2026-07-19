@@ -94,6 +94,12 @@ The mediafilesegmenter variant encrypted by the segmenter itself (`-S`, CBCS) wi
 
 Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-muxed-fmp4/pbs-bars_muxed-hevc-apple-cbcs.m3u8
 
+### PBS — Test Pattern (muxed fMP4, leading audio gaps — player loop repro)
+
+**Intentionally pathological.** The muxed AVC 720p stream above with the first ~1s of audio removed from every segment from sn 3 onward (`scripts/build-loop-stream.mjs`: trun entries dropped, tfdt advanced, data_offset moved — video and file sizes untouched). Every doctored fragment parses and appends cleanly, but the muxed SourceBuffer's buffered range (audio∩video intersection) never covers the fragment window, so the fragment stays permanently partial with no error raised. Exercises fragment-selection loop protection: players that re-request partial fragments without bounding attempts will re-download sn 3 indefinitely at network speed (hls.js ≤ v1.6.16: ~1,500 requests/second).
+
+Playlist: https://pbs.github.io/test-streams/pbs/test-pattern-loop-fmp4/pbs-bars_muxed-avc-audio-gaps.m3u8
+
 ### PBS — Test Pattern (multi-DRM, shaka packager)
 
 The clear *PBS — Test Pattern* (HEVC + AVC) ladder repackaged with [Shaka Packager](https://github.com/shaka-project/shaka-packager): HEVC 234p–2160p and AVC 234p–1080p video, AAC audio, WebVTT captions, **CBCS** encryption with the shared Axinom key (see *Axinom DRM* below), Widevine + PlayReady `pssh` boxes in the init segments, FairPlay `skd://` key tags, and an `EXT-X-I-FRAMES-ONLY` playlist per variant. PlayReady `EXT-X-KEY` tags are omitted to match Axinom's reference packaging (hls.js EME setup fails on WRMHEADER `data:` key URIs; PlayReady clients use the `pssh`).
